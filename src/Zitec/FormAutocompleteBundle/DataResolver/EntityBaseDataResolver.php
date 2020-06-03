@@ -2,6 +2,7 @@
 
 namespace Zitec\FormAutocompleteBundle\DataResolver;
 
+use Doctrine\ORM\EntityManager;
 use Symfony\Component\PropertyAccess\PropertyAccess;
 use Symfony\Component\PropertyAccess\PropertyAccessor;
 use Doctrine\Bundle\DoctrineBundle\Registry;
@@ -10,7 +11,7 @@ use Doctrine\ORM\EntityRepository;
 /**
  * Template for autocomplete data resolvers which relate the data from a field to an entity.
  */
-abstract class EntityBaseDataResolver implements DataResolverInterface
+abstract class EntityBaseDataResolver implements LimitAwareDataResolverInterface
 {
     /**
      * The doctrine service.
@@ -44,8 +45,8 @@ abstract class EntityBaseDataResolver implements DataResolverInterface
      * The consumer may provide a custom function for fetching the suggestions data.
      *
      * @var string|callable|null
-     * - the function will receive the term and should return an array of matching entities of the specified type.
-     *   It will be represented in one of the forms:
+     * - the function will receive the term and a limit and should return an array of matching entities of the specified
+     *   type. It will be represented in one of the forms:
      *      - a simple string: denotes the name of a method from the entity repository;
      *      - a callable: denotes the complete path to a function;
      */
@@ -59,6 +60,20 @@ abstract class EntityBaseDataResolver implements DataResolverInterface
     protected $propertyAccessor;
 
     /**
+     * The maximum number of returned suggestions.
+     *
+     * @var int
+     */
+    protected $suggestionsLimit;
+
+    /**
+     * The entity manager to use when fetching data.
+     *
+     * @var string|null
+     */
+    protected $entityManagerName;
+
+    /**
      * The data resolver constructor.
      *
      * @param Registry $doctrine
@@ -66,13 +81,15 @@ abstract class EntityBaseDataResolver implements DataResolverInterface
      * @param string $idPath
      * @param string $labelPath
      * @param string|callable|null $suggestionsFetcher
+     * @param string|null $entityManagerName
      */
     public function __construct(
         Registry $doctrine,
         $entityClass,
         $idPath,
         $labelPath,
-        $suggestionsFetcher = null
+        $suggestionsFetcher = null,
+        $entityManagerName = null
     ) {
         $this->doctrine = $doctrine;
         $this->entityClass = $entityClass;
@@ -80,6 +97,7 @@ abstract class EntityBaseDataResolver implements DataResolverInterface
         $this->labelPath = $labelPath;
         $this->suggestionsFetcher = $suggestionsFetcher;
         $this->propertyAccessor = PropertyAccess::createPropertyAccessor();
+        $this->entityManagerName = $entityManagerName;
     }
 
     /**
@@ -95,12 +113,12 @@ abstract class EntityBaseDataResolver implements DataResolverInterface
     protected function callSuggestionsFetcher($term)
     {
         /* @var $entityRepository EntityRepository */
-        $entityRepository = $this->doctrine->getRepository($this->entityClass);
+        $entityRepository = $this->getEntityManager()->getRepository($this->entityClass);
 
         if (is_string($this->suggestionsFetcher) && is_callable(array($entityRepository, $this->suggestionsFetcher))) {
-            return call_user_func(array($entityRepository, $this->suggestionsFetcher), $term);
+            return call_user_func(array($entityRepository, $this->suggestionsFetcher), $term, $this->suggestionsLimit);
         } elseif (is_callable($this->suggestionsFetcher)) {
-            return call_user_func($this->suggestionsFetcher, $term);
+            return call_user_func($this->suggestionsFetcher, $term, $this->suggestionsLimit);
         } else {
             throw new \LogicException(
                 'The suggestions fetcher may be either a string pointing to a repository method or a callable!'
@@ -127,11 +145,12 @@ abstract class EntityBaseDataResolver implements DataResolverInterface
         $entityAlias = (false === $classIndex) ? $this->entityClass : substr($this->entityClass, $classIndex + 1);
         $entityAlias = strtolower($entityAlias);
 
-        return $this->doctrine
+        return $this->getEntityManager()
             ->getRepository($this->entityClass)
             ->createQueryBuilder($entityAlias)
             ->where("$entityAlias.$this->labelPath LIKE :term")
             ->setParameter(':term', "%$term%")
+            ->setMaxResults($this->suggestionsLimit)
             ->getQuery()
             ->getResult();
     }
@@ -153,5 +172,25 @@ abstract class EntityBaseDataResolver implements DataResolverInterface
         }
 
         return $suggestions;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setSuggestionsLimit($suggestionsLimit)
+    {
+        $this->suggestionsLimit = $suggestionsLimit;
+
+        return $this;
+    }
+
+    /**
+     * Returns the entity manager to use for fetching data.
+     *
+     * @return EntityManager
+     */
+    protected function getEntityManager()
+    {
+        return $this->doctrine->getManager($this->entityManagerName);
     }
 }

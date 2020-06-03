@@ -21,18 +21,30 @@
                     delay: delay,
                     minimumInputLength: minimum_input_length,
                     allowClear: allow_clear,
+                    dropdownParent: dropdown_parent,
                     otherOptions: other_select2_options,
                     context: context,
-                    compatibility: false,
-                    dropdownParent: dropdownParent
+                    compatibility: false
                 }|json_encode }}"
             >
                 {% if multiple and value|length > 0 %}
                     {% for item in value %}
-                        <option value="{{ item.value }}" selected="selected">{{ item.label }}</option>
+                        <option
+                            value="{{ item.value }}"
+                            {% with {attr: item.attributes|default([])} %}{{ block('attributes') }}{% endwith %}
+                            selected="selected"
+                        >
+                            {{ item.label }}
+                        </option>
                     {% endfor %}
                 {% elseif value is not empty %}
-                    <option value="{{ value.value }}" selected="selected">{{ value.label }}</option>
+                    <option
+                        value="{{ value.value }}"
+                        {% with {attr: value.attributes|default([])} %}{{ block('attributes') }}{% endwith %}
+                        selected="selected"
+                    >
+                        {{ value.label }}
+                    </option>
                 {% endif %}
             </select>
         </div>
@@ -50,12 +62,12 @@
                     delay: delay,
                     minimumInputLength: minimum_input_length,
                     allowClear: allow_clear,
+                    dropdownParent: dropdown_parent,
                     otherOptions: other_select2_options,
                     context: context,
                     compatibility: true,
                     defaults: value,
-                    multiple: multiple,
-                    dropdownParent: dropdownParent
+                    multiple: multiple
                 }|json_encode }}"
             />
         </div>

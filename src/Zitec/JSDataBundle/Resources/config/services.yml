@@ -7,13 +7,14 @@ parameters:
 services:
 #    # The data collector used by the data handler.
     zitec.js_data.data_collector:
-        class: %zitec.js_data.data_collector.class%
+        class: "%zitec.js_data.data_collector.class%"
         public: false
 
 #    # Service which centralizes all the data which will be sent to the client's scripts.
     zitec.js_data.data_handler:
         class: Zitec\JSDataBundle\Service\DataHandler
         arguments: ['@zitec.js_data.data_collector', '@event_dispatcher']
+        public: true
 
 #    # Service which offers the functionality of the data handler service in Twig.
     zitec.js_data.twig.js_data_extension:
